@@ -178,8 +178,15 @@ jobs:
           # step above so the repo's rendered README stays in lockstep
           # with the release tag.
           if [ -f README.md ]; then git add README.md; fi
-          git commit -m "chore(release): $TAG"
-          git push origin HEAD:master
+          # Same idempotency as the npm version step: when master already
+          # carries this version (a re-run after a partial release), there
+          # is nothing to commit, so tag the current HEAD instead.
+          if git diff --cached --quiet; then
+            echo "Version files already at $VERSION; nothing to commit."
+          else
+            git commit -m "chore(release): $TAG"
+            git push origin HEAD:master
+          fi
           git tag -a "$TAG" -m "$TAG"
           git push origin "$TAG"
 
