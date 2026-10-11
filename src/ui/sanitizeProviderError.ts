@@ -12,6 +12,14 @@ import {
   stopReasonMessage,
 } from '../providers/stopReason';
 
+// OpenRouter's reply when the chosen model is text-only and the request
+// carries the page image. Image-capable is decided by provider id, so
+// on a router this is the one way a model choice can break a send —
+// the bare status alone doesn't tell the user what to change.
+const IMAGE_UNSUPPORTED_RE = /support image input/i;
+const IMAGE_UNSUPPORTED_HINT =
+  "this model can't read images. Choose one that accepts image input.";
+
 export const sanitizeProviderError = (err: unknown): string => {
   // Checked first: a ProviderStopError carries a specific reason, and
   // falling through to the generic branches below would erase it.
@@ -24,7 +32,10 @@ export const sanitizeProviderError = (err: unknown): string => {
   }
   const httpMatch = raw.match(/^([a-zA-Z][a-zA-Z0-9_-]*):\s*HTTP\s+(\d+)/);
   if (httpMatch) {
-    return `${httpMatch[1]}: HTTP ${httpMatch[2]}`;
+    const summary = `${httpMatch[1]}: HTTP ${httpMatch[2]}`;
+    return IMAGE_UNSUPPORTED_RE.test(raw)
+      ? `${summary} — ${IMAGE_UNSUPPORTED_HINT}`
+      : summary;
   }
   return 'Provider request failed.';
 };

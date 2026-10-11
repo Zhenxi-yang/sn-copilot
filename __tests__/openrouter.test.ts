@@ -18,6 +18,7 @@
  */
 import {readFileSync} from 'fs';
 import {join} from 'path';
+import {createChatCompletionsClient} from '../src/providers/openai';
 import {createOpenRouterClient} from '../src/providers/openrouter';
 import {parseKeyFile} from '../src/storage/keyFiles';
 import type {ProviderRequest} from '../src/providers/ProviderClient';
@@ -90,6 +91,24 @@ describe('createOpenRouterClient', () => {
     expect(r.stopReason).toBe('complete');
     expect(r.usage).toEqual({inputTokens: 12, outputTokens: 7});
     expect(r.modelId).toBe('google/gemini-2.5-flash');
+  });
+
+  it('extra headers can never replace auth or content-type', async () => {
+    const fetchFn: FetchSpy = jest.fn().mockResolvedValue(buildOk(okBody));
+    const client = createChatCompletionsClient(
+      {
+        id: 'openrouter',
+        endpoint: 'https://example.test/v1/chat/completions',
+        tokenCapField: () => 'max_tokens',
+        extraHeaders: {Authorization: 'Bearer stolen', 'content-type': 'text/plain'},
+      },
+      fetchFn as unknown as typeof fetch,
+    );
+    await client.send(baseReq(), {apiKey: 'sk-real', model: 'm'});
+    expect(fetchFn.mock.calls[0][1].headers).toEqual({
+      'content-type': 'application/json',
+      Authorization: 'Bearer sk-real',
+    });
   });
 
   it('forwards the abort signal so the chat timeout cancels the request', async () => {
@@ -180,7 +199,11 @@ describe('createOpenRouterClient', () => {
   it.each([
     [401, 'invalid key', 'openrouter: HTTP 401'],
     [402, 'insufficient credits', 'openrouter: HTTP 402'],
-    [404, 'No endpoints found that support image input', 'openrouter: HTTP 404'],
+    [
+      404,
+      'No endpoints found that support image input',
+      "openrouter: HTTP 404 — this model can't read images. Choose one that accepts image input.",
+    ],
     [429, 'rate limited', 'openrouter: HTTP 429'],
   ])('HTTP %i throws an openrouter-prefixed error', async (status, text, shown) => {
     const fetchFn: FetchSpy = jest
@@ -193,7 +216,8 @@ describe('createOpenRouterClient', () => {
     expect((err as Error).message).toBe(
       `openrouter: HTTP ${status} — ${text}`,
     );
-    // The chat bubble shows the provider and status, not the raw body.
+    // The chat bubble shows the provider and status, not the raw body
+    // (plus a fix-it hint when the model can't take the page image).
     expect(sanitizeProviderError(err)).toBe(shown);
   });
 });

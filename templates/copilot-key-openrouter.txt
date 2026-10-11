@@ -9,9 +9,11 @@
 #   OpenRouter model id, vendor prefix included, exactly as listed at
 #   https://openrouter.ai/models (e.g. anthropic/claude-sonnet-4.5,
 #   openai/gpt-4o-mini, google/gemini-2.5-flash).
-# - The page screenshot is sent on every chat send, so pick a model
-#   that accepts image input. A text-only model answers with an HTTP
-#   error. PilotChat needs an image model too.
+# - The page image goes with quick actions, Grill, PilotChat and any
+#   question about the page, so pick a model that accepts image input.
+#   A text-only model fails those with "this model can't read images".
+# - OpenRouter forwards each request to the model's vendor (Google for
+#   google/gemini-2.5-flash), so both see your prompt and the page.
 # - Avoid opening sensitive pages while Copilot is active.
 # - Lines starting with '#' are comments. Blank lines are ignored.
 # - First time you open Copilot Settings after dropping this file,

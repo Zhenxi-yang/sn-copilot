@@ -13,7 +13,7 @@ In notes there is also **PilotChat**: write a question by hand on a full-screen 
 
 ## Privacy is yours, not ours
 
-This plugin has **no backend**. It does not run a service, route your traffic through anyone's server, or hold a key on your behalf. You bring your own API key for Anthropic, OpenAI, Google Gemini, DeepSeek, or OpenRouter; the plugin places your request directly against that provider's API and shows the response.
+This plugin has **no backend**. It does not run a service, route your traffic through anyone's server, or hold a key on your behalf. You bring your own API key for Anthropic, OpenAI, Google Gemini, DeepSeek, or OpenRouter; the plugin places your request directly against that provider's API and shows the response. (OpenRouter is itself a router: it passes each request on to the vendor of the model you picked, so choose it only if you're happy for both to see it.)
 
 **What that means concretely:**
 
@@ -188,7 +188,9 @@ model=google/gemini-2.5-flash
 key=sk-or-v1-...
 ```
 
-One OpenRouter key reaches models from many vendors. `model=` is the OpenRouter model id with its vendor prefix, exactly as it appears on [openrouter.ai/models](https://openrouter.ai/models): `anthropic/claude-sonnet-4.5`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`. Copilot sends the page image, so pick a model that accepts image input; a text-only model answers with `Error: openrouter: HTTP 404`. Usage shows up as SnCopilot in your OpenRouter activity log.
+One OpenRouter key reaches models from many vendors. `model=` is the OpenRouter model id with its vendor prefix, exactly as it appears on [openrouter.ai/models](https://openrouter.ai/models): `anthropic/claude-sonnet-4.5`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`. The page image goes with quick actions, Grill, PilotChat and any question about the page, so pick a model that accepts image input. A text-only model fails those with `Error: openrouter: HTTP 404 — this model can't read images. Choose one that accepts image input.` Usage shows up as SnCopilot in your OpenRouter activity log.
+
+OpenRouter forwards each request to the model's vendor (Google for `google/gemini-2.5-flash`), so both OpenRouter and that vendor receive your prompt and the page image. OpenRouter's privacy settings let you restrict which upstream providers may handle your requests.
 
 ### More than one provider
 
@@ -332,6 +334,8 @@ The plugin sends two things to the configured provider on each chat send:
 
 - **Your typed prompt** plus, when available, the **transcribed page text** (typed text from `.note` files or the document's text layer for PDFs / EPUBs).
 - **The page screenshot**, except on DeepSeek where there is no vision endpoint.
+
+With OpenRouter, both OpenRouter and the vendor of the model you picked receive these.
 
 There is no "PII redaction" toggle. On a vision-capable provider the page image carries everything that's visibly on the page, so scrubbing emails or numbers from the text payload while shipping the full screenshot would be theatre. On DeepSeek (text-only) the plugin silently scrubs emails and 7+ digit runs from the outbound text, since that's the one path where redaction actually reduces what we ship.
 

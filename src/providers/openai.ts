@@ -52,7 +52,8 @@ export type ChatCompletionsConfig = {
   endpoint: string;
   // Field name for the output budget, chosen per model.
   tokenCapField: (model: string) => 'max_tokens' | 'max_completion_tokens';
-  // Sent alongside auth + content-type; must not override either.
+  // Sent alongside auth + content-type, which are spread after these
+  // and win on an exact-case key clash.
   extraHeaders?: Record<string, string>;
 };
 
