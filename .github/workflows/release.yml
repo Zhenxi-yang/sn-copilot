@@ -214,10 +214,13 @@ jobs:
           # Contributors: unique "Name|email" pairs in range.
           # Exclude GitHub Copilot and the release bot.
           # Map GitHub noreply emails to @usernames when possible.
+          # The grep is guarded like CHANGES above: a range holding only
+          # the bot's bump commit filters to nothing, grep exits 1, and
+          # pipefail would kill the step after the tag is already pushed.
           CONTRIBUTORS=$(
             git log --pretty=format:"%an|%ae" "$RANGE" \
               | sort -u \
-              | grep -viE 'copilot|github-actions\[bot\]' \
+              | { grep -viE 'copilot|github-actions\[bot\]' || true; } \
               | while IFS='|' read -r name email; do
                   [ -z "$name" ] && continue
                   user=""
