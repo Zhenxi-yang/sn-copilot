@@ -23,9 +23,9 @@
  * disabled by the re-entrancy guard in src/reentrancy.
  *
  * Privacy: there is no per-message redaction toggle. On vision
- * providers (Anthropic / OpenAI / Gemini) the page screenshot is
- * always sent verbatim. On DeepSeek (text-only) the outbound text
- * has emails and 7+ digit runs scrubbed automatically.
+ * providers (Anthropic / OpenAI / Gemini / OpenRouter) the page
+ * screenshot is always sent verbatim. On DeepSeek (text-only) the
+ * outbound text has emails and 7+ digit runs scrubbed automatically.
  */
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
@@ -442,8 +442,8 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
       // the await entirely.
       const ctx = attachContext ? await getPageContext() : null;
       // Vision capability is purely a property of the provider —
-      // anthropic / openai / gemini get the page image, deepseek
-      // doesn't. For text-only providers we silently scrub emails
+      // anthropic / openai / gemini / openrouter get the page image,
+      // deepseek doesn't. For text-only providers we silently scrub emails
       // and long digit runs (the only place redaction can actually
       // help, since there's no image channel). For image-capable
       // providers we send the composed text verbatim — redacting

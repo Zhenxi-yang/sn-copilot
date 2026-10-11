@@ -52,6 +52,8 @@ describe('matchKeyFilename — tolerance map', () => {
     ['copilot-key-google.txt', 'gemini'],
     ['copilot-key-google-gemini.txt', 'gemini'],
     ['copilot-key-deepseek.txt', 'deepseek'],
+    ['copilot-key-openrouter.txt', 'openrouter'],
+    ['copilot-key-open-router.txt', 'openrouter'],
   ])('%s → %s', (filename, expected) => {
     expect(matchKeyFilename(filename)).toBe(expected);
   });

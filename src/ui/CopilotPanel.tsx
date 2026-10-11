@@ -37,7 +37,12 @@ import {
 } from '../scope/pageContext';
 import {classifyFileKind} from '../scope/fileKind';
 import {redactPii} from '../privacy/redact';
-import {isImageCapableProvider, type CustomAction, type KeyFile} from '../types';
+import {
+  isImageCapableProvider,
+  type CustomAction,
+  type KeyFile,
+  type ProviderId,
+} from '../types';
 import ChatView from './ChatView';
 import GrillView from './GrillView';
 import SettingsView from './SettingsView';
@@ -55,11 +60,12 @@ export type CopilotPanelProps = {
 const DEFAULT_SCOPE_LABEL = 'Current Page';
 const PROVIDER_LABEL_FALLBACK = 'Demo (no key)';
 
-const PROVIDER_LABEL_FOR_ACTIVE: Record<string, string> = {
+const PROVIDER_LABEL_FOR_ACTIVE: Record<ProviderId, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   gemini: 'Gemini',
   deepseek: 'DeepSeek',
+  openrouter: 'OpenRouter',
 };
 
 export default function CopilotPanel(

@@ -16,6 +16,27 @@ describe('sanitizeProviderError', () => {
     ).toBe('anthropic: HTTP 401');
   });
 
+  it('tells the user to pick an image model when a text-only one gets the page', () => {
+    // Exact body OpenRouter returned live for deepseek/deepseek-chat.
+    expect(
+      sanitizeProviderError(
+        new Error(
+          'openrouter: HTTP 404 — {"error":{"message":"No endpoints found that support image input","code":404}}',
+        ),
+      ),
+    ).toBe(
+      "openrouter: HTTP 404 — this model can't read images. Choose one that accepts image input.",
+    );
+  });
+
+  it('keeps other 404s to provider + status', () => {
+    expect(
+      sanitizeProviderError(
+        new Error('openrouter: HTTP 404 — {"error":{"message":"Not found"}}'),
+      ),
+    ).toBe('openrouter: HTTP 404');
+  });
+
   it('handles HTTP errors without a body suffix', () => {
     expect(sanitizeProviderError(new Error('openai: HTTP 500'))).toBe(
       'openai: HTTP 500',

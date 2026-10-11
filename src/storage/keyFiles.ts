@@ -1,7 +1,7 @@
 // Discovery + parsing for `copilot-key-<provider>.txt` files under
 // `/storage/emulated/0/MyStyle/SnCopilot/`.
 //
-// One file per provider (anthropic|openai|gemini|deepseek). The user
+// One file per provider (anthropic|openai|gemini|deepseek|openrouter). The user
 // drops these in via USB or any cloud-sync provider and edits in
 // place. The plugin never writes to them.
 //
@@ -48,6 +48,7 @@ export type DiscoveryDeps = {
 //   openai    / gpt    / chatgpt                       → openai
 //   gemini    / google / google-gemini                 → gemini
 //   deepseek                                            → deepseek
+//   openrouter / open-router                            → openrouter
 //
 // The in-file `provider=` line still cross-checks against the
 // CANONICAL id (so a `copilot-key-claude.txt` must contain
@@ -65,6 +66,8 @@ const FILENAME_SUFFIX_MAP: Record<string, ProviderId> = {
   google: 'gemini',
   'google-gemini': 'gemini',
   deepseek: 'deepseek',
+  openrouter: 'openrouter',
+  'open-router': 'openrouter',
 };
 
 const FILENAME_RE = /^copilot-key-(.+)\.txt$/;

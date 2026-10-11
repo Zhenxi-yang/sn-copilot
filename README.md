@@ -13,13 +13,13 @@ In notes there is also **PilotChat**: write a question by hand on a full-screen 
 
 ## Privacy is yours, not ours
 
-This plugin has **no backend**. It does not run a service, route your traffic through anyone's server, or hold a key on your behalf. You bring your own API key for Anthropic, OpenAI, Google Gemini, or DeepSeek; the plugin places your request directly against that provider's API and shows the response.
+This plugin has **no backend**. It does not run a service, route your traffic through anyone's server, or hold a key on your behalf. You bring your own API key for Anthropic, OpenAI, Google Gemini, DeepSeek, or OpenRouter; the plugin places your request directly against that provider's API and shows the response. (OpenRouter is itself a router: it passes each request on to the vendor of the model you picked, so choose it only if you're happy for both to see it.)
 
 **What that means concretely:**
 
 - **You own the key.** It lives in a text file in `MyStyle/SnCopilot/` on your device — created by you, never uploaded by us, never copied off the device by the plugin. You can [optionally encrypt it with a PIN](#optional-encrypt-your-key-with-a-pin) so other plugins on the same device can't read it.
 - **You own the conversation.** Requests go from your device to the provider you chose. We never see them. There is no "Copilot history" stored anywhere outside your provider's account.
-- **You own the audit.** Every billable request shows up on **your** OpenAI / Anthropic / Google / DeepSeek dashboard, with timestamps and token counts. You can revoke the key, rotate it, see exactly what it cost, and stop in one click.
+- **You own the audit.** Every billable request shows up on **your** OpenAI / Anthropic / Google / DeepSeek / OpenRouter dashboard, with timestamps and token counts. You can revoke the key, rotate it, see exactly what it cost, and stop in one click.
 
 ### How this differs from other e-ink AI plugins
 
@@ -57,11 +57,12 @@ https://github.com/user-attachments/assets/ac096146-8aee-4304-af62-0f9a9776485b
 
 ## Quick start
 
-1. **Pick a provider** and grab a key from their console. We ship templates for four:
+1. **Pick a provider** and grab a key from their console. We ship templates for five:
    - [Anthropic Claude](https://console.anthropic.com/) — `templates/copilot-key-anthropic.txt`
    - [OpenAI](https://platform.openai.com/api-keys) — `templates/copilot-key-openai.txt`
    - [Google Gemini](https://aistudio.google.com/app/apikey) — `templates/copilot-key-gemini.txt`
    - [DeepSeek](https://platform.deepseek.com/api_keys) — `templates/copilot-key-deepseek.txt` *(text-only; the page image is not sent)*
+   - [OpenRouter](https://openrouter.ai/settings/keys) — `templates/copilot-key-openrouter.txt` *(one key for models from many vendors)*
 
 2. **Create the directory on your Supernote** and copy the template:
 
@@ -81,6 +82,8 @@ https://github.com/user-attachments/assets/ac096146-8aee-4304-af62-0f9a9776485b
    key=sk-proj-1345abCDef67890hijkLMNOpqrSTUvwxYZ012abc
    ```
 
+   Every field and each provider's details are in [Key file format](#key-file-format) and [Setting up each provider](#setting-up-each-provider).
+
 4. **Tap the Copilot button** on the sidebar of any note, PDF, or EPUB. The popup opens; tap **Summary** to confirm everything works.
 
 That's it. There is no account to create, no service to register against, no companion app on your phone.
@@ -93,10 +96,118 @@ That's it. There is no account to create, no service to register against, no com
 | OpenAI | `gpt-4o-mini` | yes | Cheapest GPT-4-class model with vision. |
 | Google Gemini | `gemini-2.5-flash` | yes | Lowest-cost Gemini with vision; high context window. |
 | DeepSeek | `deepseek-chat` | no — text only | Cheapest LLM available; fine for typed-text notes / extracted PDF text, no image support. |
+| OpenRouter | `google/gemini-2.5-flash` | yes, if the model takes images | Same low-cost vision model as the Gemini template, billed through OpenRouter. |
 
-You can change `model=` to any model the provider exposes — the plugin doesn't allow-list. If a model name is wrong the provider returns an HTTP error, which is shown verbatim in the chat as `Error: <provider>: HTTP <status>`.
+You can change `model=` to any model the provider exposes — the plugin doesn't allow-list. If a model name is wrong the provider returns an HTTP error, which is shown in the chat as `Error: <provider>: HTTP <status>`.
 
-> **OpenAI gpt-5 / o-series users:** the plugin auto-detects newer reasoning + GPT-5 family model ids (`gpt-5*`, `o1*`, `o3*`, `o4*`) and sends `max_completion_tokens` instead of the legacy `max_tokens` field that those models reject. You don't need to do anything — just put the model id in `model=` and it works.
+## Key file format
+
+Each provider gets one plain-text file in `/storage/emulated/0/MyStyle/SnCopilot/`, named `copilot-key-<provider>.txt`, with one `name=value` per line:
+
+```text
+provider=anthropic
+model=claude-haiku-4-5
+key=sk-ant-...
+```
+
+| Field | Required | What goes in it |
+|---|---|---|
+| `provider` | yes | `anthropic`, `openai`, `gemini`, `deepseek` or `openrouter`. It must match the provider in the filename. |
+| `model` | yes | The model id, exactly as the provider spells it. |
+| `key` | yes | Your API key. |
+| `default_provider` | only with two or more key files | The provider Copilot should use. See [More than one provider](#more-than-one-provider). |
+
+The filename also accepts a few common spellings: `copilot-key-claude.txt`, `-claude-ai` and `-claude-anthropic` for Anthropic; `-gpt` and `-chatgpt` for OpenAI; `-google` and `-google-gemini` for Gemini; `-open-router` for OpenRouter. The `provider=` line inside always uses the canonical name, so `copilot-key-claude.txt` still says `provider=anthropic`.
+
+How the file is read:
+
+- Lines starting with `#` are comments, and blank lines are skipped.
+- Spaces around the name, the `=` and the value are trimmed; tabs and Windows line endings are fine.
+- Everything after the `=` is the value. Quotes are kept, so write `key=sk-...`, not `key="sk-..."`, and don't put a `#` comment at the end of a line.
+- If a field appears twice, the last one wins. Unknown fields are ignored.
+
+When a file can't be used — a required field missing, or `provider=` not matching the filename — Settings lists the file with the reason.
+
+## Setting up each provider
+
+### Anthropic (Claude)
+
+Get a key at [console.anthropic.com](https://console.anthropic.com/) and start from `templates/copilot-key-anthropic.txt`:
+
+```text
+provider=anthropic
+model=claude-haiku-4-5
+key=sk-ant-...
+```
+
+Every current Claude model reads the page image.
+
+### OpenAI
+
+Get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) and start from `templates/copilot-key-openai.txt`:
+
+```text
+provider=openai
+model=gpt-4o-mini
+key=sk-proj-...
+```
+
+Use a model that accepts images, such as `gpt-4o-mini`, `gpt-4o` or `gpt-5`. For the GPT-5 family and the o-series reasoning models (`gpt-5*`, `o1*`, `o3*`, `o4*`) the plugin sends `max_completion_tokens` instead of the older `max_tokens` those models reject, so any of them works as-is.
+
+### Google Gemini
+
+Get a key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) and start from `templates/copilot-key-gemini.txt`:
+
+```text
+provider=gemini
+model=gemini-2.5-flash
+key=AIza...
+```
+
+Gemini models read the page image. Use the model id as Google lists it, without a `models/` prefix.
+
+### DeepSeek
+
+Get a key at [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) and start from `templates/copilot-key-deepseek.txt`:
+
+```text
+provider=deepseek
+model=deepseek-chat
+key=sk-...
+```
+
+DeepSeek has no vision endpoint, so Copilot sends only the page text (typed text and handwriting recognition), never the image, and scrubs emails and 7+ digit runs from it first. PilotChat needs a provider that reads images, so it isn't available on DeepSeek.
+
+### OpenRouter
+
+Get a key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) and start from `templates/copilot-key-openrouter.txt`:
+
+```text
+provider=openrouter
+model=google/gemini-2.5-flash
+key=sk-or-v1-...
+```
+
+One OpenRouter key reaches models from many vendors. `model=` is the OpenRouter model id with its vendor prefix, exactly as it appears on [openrouter.ai/models](https://openrouter.ai/models): `anthropic/claude-sonnet-4.5`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`. The page image goes with quick actions, Grill, PilotChat and any question about the page, so pick a model that accepts image input. A text-only model fails those with `Error: openrouter: HTTP 404 — this model can't read images. Choose one that accepts image input.` Usage shows up as SnCopilot in your OpenRouter activity log.
+
+OpenRouter forwards each request to the model's vendor (Google for `google/gemini-2.5-flash`), so both OpenRouter and that vendor receive your prompt and the page image. OpenRouter's privacy settings let you restrict which upstream providers may handle your requests.
+
+### More than one provider
+
+You can keep key files for several providers side by side. Add `default_provider=` to one of them to say which one Copilot uses:
+
+```text
+MyStyle/SnCopilot/
+├── copilot-key-openai.txt        provider=openai, model=gpt-5, key=...
+└── copilot-key-openrouter.txt    provider=openrouter, model=google/gemini-2.5-flash, key=...,
+                                  default_provider=openrouter
+```
+
+- With no `default_provider` in any file, Copilot asks you to add one.
+- If two files name different defaults, Copilot won't guess; make them agree or remove one.
+- If the default names a provider with no key file, Copilot says which file is missing.
+
+To switch providers, change the `default_provider=` line, or remove the other key files.
 
 ## PilotChat — ask in your own handwriting (Notes)
 
@@ -122,7 +233,7 @@ A full-screen page where you write a question with the pen and the answer is wri
 - On **New**, **Discard** starts a fresh page and the old conversation is gone.
 - After an Insert from Close, carry on and Insert again in the same note: the copy you inserted is replaced by the whole conversation, in the same place. If that copy has changed since (you wrote on it, or its pages moved), it is left alone and the new one is added after the page you are on.
 
-**What it needs:** PilotChat answers with the key you set up for Copilot, so set Copilot up first. It reads your handwriting as an image, so it needs Anthropic, OpenAI or Gemini; DeepSeek is text-only and can't. With no key, locked keys, or DeepSeek, PilotChat opens to a message saying what to do instead of the writing page.
+**What it needs:** PilotChat answers with the key you set up for Copilot, so set Copilot up first. It reads your handwriting as an image, so it needs Anthropic, OpenAI, Gemini or OpenRouter (with a model that takes images); DeepSeek is text-only and can't. With no key, locked keys, or DeepSeek, PilotChat opens to a message saying what to do instead of the writing page.
 
 **What it sends:** an image of the question you just wrote, cropped to your writing, plus the earlier questions and answers of the conversation as text. Nothing else from the note.
 
@@ -224,6 +335,8 @@ The plugin sends two things to the configured provider on each chat send:
 - **Your typed prompt** plus, when available, the **transcribed page text** (typed text from `.note` files or the document's text layer for PDFs / EPUBs).
 - **The page screenshot**, except on DeepSeek where there is no vision endpoint.
 
+With OpenRouter, both OpenRouter and the vendor of the model you picked receive these.
+
 There is no "PII redaction" toggle. On a vision-capable provider the page image carries everything that's visibly on the page, so scrubbing emails or numbers from the text payload while shipping the full screenshot would be theatre. On DeepSeek (text-only) the plugin silently scrubs emails and 7+ digit runs from the outbound text, since that's the one path where redaction actually reduces what we ship.
 
 **PilotChat** sends an image of each handwritten question, cropped to the writing, plus the conversation so far as text. It does not send the note's pages.
@@ -236,7 +349,7 @@ The Supernote plugin runtime gives every installed plugin the same filesystem ac
 
 Two mitigations, in increasing strength:
 
-1. **Provider-side spend cap (always do this).** On the Anthropic / OpenAI / Google / DeepSeek dashboard, set a low monthly budget on the API key Copilot uses. A stolen key is then annoying instead of expensive. Use a *dedicated* key for Copilot that has no other entitlements.
+1. **Provider-side spend cap (always do this).** On the Anthropic / OpenAI / Google / DeepSeek / OpenRouter dashboard, set a low monthly budget on the API key Copilot uses. A stolen key is then annoying instead of expensive. Use a *dedicated* key for Copilot that has no other entitlements.
 2. **Encrypt the key with a PIN (opt-in).** See the section below.
 
 ## Optional: encrypt your key with a PIN

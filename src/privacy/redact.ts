@@ -6,9 +6,9 @@
 // number than ship a real bank account through.
 //
 // Applied unconditionally on the DeepSeek (text-only) path. Vision
-// providers (Anthropic / OpenAI / Gemini) skip this step because the
-// page screenshot already carries any PII visible on the page —
-// scrubbing the text payload while shipping the image would be
+// providers (Anthropic / OpenAI / Gemini / OpenRouter) skip this step
+// because the page screenshot already carries any PII visible on the
+// page — scrubbing the text payload while shipping the image would be
 // theatre.
 
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;

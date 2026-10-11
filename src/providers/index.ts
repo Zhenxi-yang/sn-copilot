@@ -8,6 +8,7 @@ import {createAnthropicClient} from './anthropic';
 import {createOpenAIClient} from './openai';
 import {createGeminiClient} from './gemini';
 import {createDeepSeekClient} from './deepseek';
+import {createOpenRouterClient} from './openrouter';
 import type {ProviderClient, ProviderId} from './ProviderClient';
 
 export const createProviderClient = (
@@ -23,5 +24,7 @@ export const createProviderClient = (
       return createGeminiClient(fetchFn);
     case 'deepseek':
       return createDeepSeekClient(fetchFn);
+    case 'openrouter':
+      return createOpenRouterClient(fetchFn);
   }
 };

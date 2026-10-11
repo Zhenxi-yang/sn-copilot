@@ -6,13 +6,19 @@
  * maps directly to ProviderId without translation.
  */
 
-export type ProviderId = 'anthropic' | 'openai' | 'gemini' | 'deepseek';
+export type ProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'gemini'
+  | 'deepseek'
+  | 'openrouter';
 
 export const PROVIDER_IDS: readonly ProviderId[] = [
   'anthropic',
   'openai',
   'gemini',
   'deepseek',
+  'openrouter',
 ] as const;
 
 // Parsed contents of one copilot-key-<provider>.txt file. Produced by
@@ -20,7 +26,9 @@ export const PROVIDER_IDS: readonly ProviderId[] = [
 //
 // Vision capability is derived strictly from `provider` via
 // isImageCapableProvider — there's no per-key opt-out. DeepSeek is
-// the only text-only provider; the rest carry images. A `mode=…`
+// the only text-only provider; the rest carry images. OpenRouter counts
+// as image-capable: the user picks a vision model there, the same way
+// they pick a model id for any other provider. A `mode=…`
 // line in the on-disk file is logged-and-ignored by the parser for
 // backwards compatibility with old templates.
 export type KeyFile = {

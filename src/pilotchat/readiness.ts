@@ -12,7 +12,7 @@ export const NEEDS_UNLOCK =
 export const NEEDS_KEY_SETUP =
   'Copilot has new key files to finish setting up. Open Copilot from the sidebar, then open PilotChat again.';
 export const NEEDS_VISION =
-  "PilotChat reads your handwriting with an AI that can see images, and DeepSeek can't. Switch Copilot to Anthropic, OpenAI or Gemini to use PilotChat.";
+  "PilotChat reads your handwriting with an AI that can see images, and DeepSeek can't. Switch Copilot to Anthropic, OpenAI, Gemini or OpenRouter to use PilotChat.";
 
 /**
  * Why PilotChat cannot answer with [state] and its active [keyFile], or

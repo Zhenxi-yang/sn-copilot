@@ -28,8 +28,9 @@ export interface ProviderRequest {
   systemPrompt: string;
   userText: string;
   // Optional base64-encoded PNG of the current page. Image-capable
-  // providers (anthropic, openai, gemini) attach it as an image part
-  // alongside the text; deepseek (text-only) drops it with a warn.
+  // providers (anthropic, openai, gemini, openrouter) attach it as an
+  // image part alongside the text; deepseek (text-only) drops it with
+  // a warn.
   imageBase64?: string;
   // Prior turns of the current conversation, oldest first, already
   // normalised by buildProviderHistory (starts with 'user', strictly
