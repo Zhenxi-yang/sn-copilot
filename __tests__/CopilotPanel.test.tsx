@@ -356,17 +356,20 @@ describe('CopilotPanel — navigation root', () => {
     expect(prefsWritten ?? '').toContain('"hasSeenSettings":true');
   });
 
-  it('shows the resolved provider label when discovery returns one valid file', async () => {
+  it.each([
+    ['anthropic', 'claude-haiku-4-5', 'Anthropic'],
+    ['openrouter', 'google/gemini-2.5-flash', 'OpenRouter'],
+  ])('shows the resolved provider label for a valid %s key file', async (provider, model, label) => {
     mockListFiles.mockResolvedValueOnce([
       fileEntry(
-        '/storage/emulated/0/MyStyle/SnCopilot/copilot-key-anthropic.txt',
+        `/storage/emulated/0/MyStyle/SnCopilot/copilot-key-${provider}.txt`,
       ),
     ]);
     // The fileIo bridge gates fetch on `exists` — both files need to
     // be reported present or fetch is short-circuited.
     mockExists.mockImplementation(async (p: string) =>
       p.endsWith('.copilot-prefs.json') ||
-      p.endsWith('copilot-key-anthropic.txt'),
+      p.endsWith(`copilot-key-${provider}.txt`),
     );
     mockFetch.mockImplementation(async (url: string) => {
       // Prefs read needs to report a "returning user" so the panel
@@ -382,9 +385,7 @@ describe('CopilotPanel — navigation root', () => {
         );
       }
       if (url.startsWith('file://')) {
-        return fileResp(
-          'provider=anthropic\nmodel=claude-haiku-4-5\nkey=sk-ant-x\n',
-        );
+        return fileResp(`provider=${provider}\nmodel=${model}\nkey=sk-x\n`);
       }
       return {ok: false, status: 500, text: async () => ''};
     });
@@ -394,8 +395,8 @@ describe('CopilotPanel — navigation root', () => {
       await flushPromises();
     });
     liveTrees.push(tree);
-    await waitForText(tree, 'Provider: Anthropic', 20);
-    expect(findAllText(tree).join(' | ')).toContain('Provider: Anthropic');
+    await waitForText(tree, `Provider: ${label}`, 20);
+    expect(findAllText(tree).join(' | ')).toContain(`Provider: ${label}`);
   });
 
   it('logs and falls back when discovery throws', async () => {

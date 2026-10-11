@@ -13,13 +13,13 @@ In notes there is also **PilotChat**: write a question by hand on a full-screen 
 
 ## Privacy is yours, not ours
 
-This plugin has **no backend**. It does not run a service, route your traffic through anyone's server, or hold a key on your behalf. You bring your own API key for Anthropic, OpenAI, Google Gemini, or DeepSeek; the plugin places your request directly against that provider's API and shows the response.
+This plugin has **no backend**. It does not run a service, route your traffic through anyone's server, or hold a key on your behalf. You bring your own API key for Anthropic, OpenAI, Google Gemini, DeepSeek, or OpenRouter; the plugin places your request directly against that provider's API and shows the response.
 
 **What that means concretely:**
 
 - **You own the key.** It lives in a text file in `MyStyle/SnCopilot/` on your device — created by you, never uploaded by us, never copied off the device by the plugin. You can [optionally encrypt it with a PIN](#optional-encrypt-your-key-with-a-pin) so other plugins on the same device can't read it.
 - **You own the conversation.** Requests go from your device to the provider you chose. We never see them. There is no "Copilot history" stored anywhere outside your provider's account.
-- **You own the audit.** Every billable request shows up on **your** OpenAI / Anthropic / Google / DeepSeek dashboard, with timestamps and token counts. You can revoke the key, rotate it, see exactly what it cost, and stop in one click.
+- **You own the audit.** Every billable request shows up on **your** OpenAI / Anthropic / Google / DeepSeek / OpenRouter dashboard, with timestamps and token counts. You can revoke the key, rotate it, see exactly what it cost, and stop in one click.
 
 ### How this differs from other e-ink AI plugins
 
@@ -57,11 +57,12 @@ https://github.com/user-attachments/assets/ac096146-8aee-4304-af62-0f9a9776485b
 
 ## Quick start
 
-1. **Pick a provider** and grab a key from their console. We ship templates for four:
+1. **Pick a provider** and grab a key from their console. We ship templates for five:
    - [Anthropic Claude](https://console.anthropic.com/) — `templates/copilot-key-anthropic.txt`
    - [OpenAI](https://platform.openai.com/api-keys) — `templates/copilot-key-openai.txt`
    - [Google Gemini](https://aistudio.google.com/app/apikey) — `templates/copilot-key-gemini.txt`
    - [DeepSeek](https://platform.deepseek.com/api_keys) — `templates/copilot-key-deepseek.txt` *(text-only; the page image is not sent)*
+   - [OpenRouter](https://openrouter.ai/settings/keys) — `templates/copilot-key-openrouter.txt` *(one key for models from many vendors)*
 
 2. **Create the directory on your Supernote** and copy the template:
 
@@ -93,10 +94,13 @@ That's it. There is no account to create, no service to register against, no com
 | OpenAI | `gpt-4o-mini` | yes | Cheapest GPT-4-class model with vision. |
 | Google Gemini | `gemini-2.5-flash` | yes | Lowest-cost Gemini with vision; high context window. |
 | DeepSeek | `deepseek-chat` | no — text only | Cheapest LLM available; fine for typed-text notes / extracted PDF text, no image support. |
+| OpenRouter | `google/gemini-2.5-flash` | yes, if the model takes images | Same low-cost vision model as the Gemini template, billed through OpenRouter. |
 
 You can change `model=` to any model the provider exposes — the plugin doesn't allow-list. If a model name is wrong the provider returns an HTTP error, which is shown verbatim in the chat as `Error: <provider>: HTTP <status>`.
 
 > **OpenAI gpt-5 / o-series users:** the plugin auto-detects newer reasoning + GPT-5 family model ids (`gpt-5*`, `o1*`, `o3*`, `o4*`) and sends `max_completion_tokens` instead of the legacy `max_tokens` field that those models reject. You don't need to do anything — just put the model id in `model=` and it works.
+
+> **OpenRouter users:** `model=` takes the OpenRouter model id with its vendor prefix, exactly as it appears on [openrouter.ai/models](https://openrouter.ai/models) — `anthropic/claude-sonnet-4.5`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`. Copilot sends the page screenshot, so pick a model that accepts image input; a text-only model answers with `Error: openrouter: HTTP 404`.
 
 ## PilotChat — ask in your own handwriting (Notes)
 
@@ -122,7 +126,7 @@ A full-screen page where you write a question with the pen and the answer is wri
 - On **New**, **Discard** starts a fresh page and the old conversation is gone.
 - After an Insert from Close, carry on and Insert again in the same note: the copy you inserted is replaced by the whole conversation, in the same place. If that copy has changed since (you wrote on it, or its pages moved), it is left alone and the new one is added after the page you are on.
 
-**What it needs:** PilotChat answers with the key you set up for Copilot, so set Copilot up first. It reads your handwriting as an image, so it needs Anthropic, OpenAI or Gemini; DeepSeek is text-only and can't. With no key, locked keys, or DeepSeek, PilotChat opens to a message saying what to do instead of the writing page.
+**What it needs:** PilotChat answers with the key you set up for Copilot, so set Copilot up first. It reads your handwriting as an image, so it needs Anthropic, OpenAI, Gemini or OpenRouter (with a model that takes images); DeepSeek is text-only and can't. With no key, locked keys, or DeepSeek, PilotChat opens to a message saying what to do instead of the writing page.
 
 **What it sends:** an image of the question you just wrote, cropped to your writing, plus the earlier questions and answers of the conversation as text. Nothing else from the note.
 
@@ -236,7 +240,7 @@ The Supernote plugin runtime gives every installed plugin the same filesystem ac
 
 Two mitigations, in increasing strength:
 
-1. **Provider-side spend cap (always do this).** On the Anthropic / OpenAI / Google / DeepSeek dashboard, set a low monthly budget on the API key Copilot uses. A stolen key is then annoying instead of expensive. Use a *dedicated* key for Copilot that has no other entitlements.
+1. **Provider-side spend cap (always do this).** On the Anthropic / OpenAI / Google / DeepSeek / OpenRouter dashboard, set a low monthly budget on the API key Copilot uses. A stolen key is then annoying instead of expensive. Use a *dedicated* key for Copilot that has no other entitlements.
 2. **Encrypt the key with a PIN (opt-in).** See the section below.
 
 ## Optional: encrypt your key with a PIN

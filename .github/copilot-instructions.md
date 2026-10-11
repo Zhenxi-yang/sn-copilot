@@ -111,7 +111,7 @@ Keys live on disk in `MyStyle/SnCopilot/copilot-key-*.txt` and in process memory
 - Echoes a key into an error message or stack trace.
 
 ### Vision capability is derived from provider id, not configurable
-`isImageCapableProvider(provider)` is the single source of truth: anthropic / openai / gemini get the page image, deepseek does not. There's no `mode=` field, no chat-header PII toggle, no Settings vision toggle — all removed because they were leaky abstractions (mode= broke handwriting Notes when set to text on a vision provider; PII redaction shipped while the image carried the same content was theatre). Flag any PR that:
+`isImageCapableProvider(provider)` is the single source of truth: anthropic / openai / gemini / openrouter get the page image, deepseek does not. There's no `mode=` field, no chat-header PII toggle, no Settings vision toggle — all removed because they were leaky abstractions (mode= broke handwriting Notes when set to text on a vision provider; PII redaction shipped while the image carried the same content was theatre). Flag any PR that:
 - Reintroduces a per-key opt-out for image attachment.
 - Adds a user-facing PII toggle that scrubs text without dropping the image.
 - Adds opaque "redaction" to the image path that doesn't actually mask pixels (false advertising).

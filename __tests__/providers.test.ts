@@ -1,5 +1,5 @@
 /**
- * Tests for the four real provider clients + their shared
+ * Tests for the real provider clients + their shared
  * HTTP error helper + the registry index. Wire-level shape pins:
  *
  *   - Endpoint URL, method, headers, body shape per provider.
@@ -21,6 +21,7 @@ import {
 } from '../src/providers/openai';
 import {createGeminiClient} from '../src/providers/gemini';
 import {createDeepSeekClient} from '../src/providers/deepseek';
+import {createOpenRouterClient} from '../src/providers/openrouter';
 import {createProviderClient} from '../src/providers/index';
 import {
   finiteOrUndefined,
@@ -693,6 +694,17 @@ describe('stop-reason mapping — per provider', () => {
   });
 
   it.each([
+    ['stop', 'complete'],
+    ['length', 'truncated'],
+    ['content_filter', 'refused'],
+    ['error', 'unknown'],
+    [undefined, 'unknown'],
+  ])('openrouter: finish_reason %p → %s', async (finish, expected) => {
+    const r = await sendWith(createOpenRouterClient, oaBody(finish));
+    expect(r.stopReason).toBe(expected);
+  });
+
+  it.each([
     ['end_turn', 'complete'],
     ['stop_sequence', 'complete'],
     ['max_tokens', 'truncated'],
@@ -818,6 +830,7 @@ describe('boundary hardening — hostile provider JSON', () => {
   it.each([
     ['openai', createOpenAIClient],
     ['deepseek', createDeepSeekClient],
+    ['openrouter', createOpenRouterClient],
   ] as const)('%s coerces a non-string content rather than trusting it', async (_n, make) => {
     // A non-string here previously made the caller's text.trim() throw
     // with "text.trim is not a function".
@@ -837,6 +850,7 @@ describe('boundary hardening — hostile provider JSON', () => {
 
   it.each([
     ['openai', createOpenAIClient, {usage: {prompt_tokens: 'lots', completion_tokens: null}}],
+    ['openrouter', createOpenRouterClient, {usage: {prompt_tokens: 'lots', completion_tokens: null}}],
     ['anthropic', createAnthropicClient, {usage: {input_tokens: 'lots', output_tokens: NaN}}],
   ] as const)('%s never yields NaN in usage counts', async (_n, make, body) => {
     const fetchFn = jest.fn().mockResolvedValue(
@@ -889,6 +903,7 @@ describe('INV1 — no sampling parameters on any provider', () => {
     ['openai', createOpenAIClient],
     ['gemini', createGeminiClient],
     ['deepseek', createDeepSeekClient],
+    ['openrouter', createOpenRouterClient],
   ] as const)('%s sends no temperature/top_p/top_k/penalties', async (_n, make) => {
     // Every current flagship model rejects non-default sampling, so
     // adding a temperature control would break them all at once.
@@ -921,7 +936,7 @@ describe('INV1 — no sampling parameters on any provider', () => {
 describe('createProviderClient — registry', () => {
   const fetchFn = jest.fn();
 
-  it.each(['anthropic', 'openai', 'gemini', 'deepseek'] as const)(
+  it.each(['anthropic', 'openai', 'gemini', 'deepseek', 'openrouter'] as const)(
     'returns a client whose id is %s',
     id => {
       const c = createProviderClient(id, fetchFn as unknown as typeof fetch);

@@ -46,7 +46,7 @@ describe('useProviderClient', () => {
     expect(readout()).toBe('openai|sk-real|gpt-4o-mini');
   });
 
-  it.each(['anthropic', 'gemini', 'deepseek'] as const)(
+  it.each(['anthropic', 'gemini', 'deepseek', 'openrouter'] as const)(
     'wires provider id %s through to client.id',
     provider => {
       const keyFile: KeyFile = {

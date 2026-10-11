@@ -10,7 +10,7 @@ import {StyleSheet, Text, View} from 'react-native';
 const SETUP_STEPS: ReadonlyArray<{title: string; body: string}> = [
   {
     title: 'Pick a provider',
-    body: 'Anthropic, OpenAI, Google Gemini, or DeepSeek. Grab an API key from their console.',
+    body: 'Anthropic, OpenAI, Google Gemini, DeepSeek, or OpenRouter. Grab an API key from their console.',
   },
   {
     title: 'Create the folder',

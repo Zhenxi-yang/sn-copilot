@@ -1,8 +1,8 @@
 import type {StopReason} from './ProviderClient';
 
 // Maps an OpenAI-shaped `finish_reason` onto the shared StopReason.
-// Shared because the DeepSeek API is Chat Completions compatible and
-// its response envelope is byte-identical to OpenAI's — duplicating
+// Shared because DeepSeek and OpenRouter are Chat Completions compatible
+// and their response envelope is byte-identical to OpenAI's — duplicating
 // the mapping would let the two drift.
 export const mapChatCompletionsStopReason = (raw: unknown): StopReason => {
   switch (raw) {
@@ -37,8 +37,8 @@ export const finiteOrUndefined = (v: unknown): number | undefined => {
 };
 
 // Small helpers shared by two or more provider clients: the HTTP error
-// formatter, the Chat Completions stop-reason mapper (OpenAI and
-// DeepSeek speak the same envelope), and the numeric coercions used on
+// formatter, the Chat Completions stop-reason mapper (OpenAI, DeepSeek
+// and OpenRouter speak the same envelope), and the numeric coercions used on
 // every usage field.
 //
 // Error formatter — the body-text

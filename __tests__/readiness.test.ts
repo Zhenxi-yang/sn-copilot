@@ -41,6 +41,13 @@ describe('unavailableReason', () => {
     ).toBe(NEEDS_KEY_SETUP);
   });
 
+  it('is ready with an OpenRouter key, which carries the page image', () => {
+    const openrouter = {...KEY, provider: 'openrouter'} as KeyFile;
+    expect(
+      unavailableReason({kind: 'plaintext', files: [openrouter]}, openrouter),
+    ).toBeNull();
+  });
+
   it('asks for a provider that can see when the key cannot', () => {
     const deepseek = {...KEY, provider: 'deepseek'} as KeyFile;
     expect(

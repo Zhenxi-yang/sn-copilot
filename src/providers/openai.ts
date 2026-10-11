@@ -12,6 +12,10 @@
  * gpt-5 fail with a 400 ("unsupported parameter"), and sending only
  * `max_completion_tokens` makes legacy models fail too. So it has
  * to be one-or-the-other, chosen per call.
+ *
+ * The request/response handling lives in createChatCompletionsClient
+ * so OpenAI-compatible gateways (OpenRouter) share it rather than
+ * copying it: same body, same envelope, same coercions.
  */
 
 import {
@@ -20,7 +24,12 @@ import {
   mapChatCompletionsStopReason,
   throwHttpError,
 } from './_http';
-import type {ProviderClient, ProviderRequest, ProviderResponse} from './ProviderClient';
+import type {
+  ProviderClient,
+  ProviderId,
+  ProviderRequest,
+  ProviderResponse,
+} from './ProviderClient';
 
 const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
@@ -36,10 +45,22 @@ const NEW_TOKEN_PARAM_RE = /^(o[1-9]|gpt-[5-9])/i;
 export const usesMaxCompletionTokens = (model: string): boolean =>
   NEW_TOKEN_PARAM_RE.test(model);
 
-export const createOpenAIClient = (
-  fetchFn: typeof fetch = globalThis.fetch,
+// What differs between two Chat Completions endpoints that otherwise
+// speak the same wire format.
+export type ChatCompletionsConfig = {
+  id: ProviderId;
+  endpoint: string;
+  // Field name for the output budget, chosen per model.
+  tokenCapField: (model: string) => 'max_tokens' | 'max_completion_tokens';
+  // Sent alongside auth + content-type; must not override either.
+  extraHeaders?: Record<string, string>;
+};
+
+export const createChatCompletionsClient = (
+  config: ChatCompletionsConfig,
+  fetchFn: typeof fetch,
 ): ProviderClient => ({
-  id: 'openai',
+  id: config.id,
   async send(
     req: ProviderRequest,
     opts: {apiKey: string; model: string},
@@ -60,9 +81,7 @@ export const createOpenAIClient = (
           {type: 'text', text: req.userText},
         ]
       : req.userText;
-    const tokenCap = usesMaxCompletionTokens(opts.model)
-      ? {max_completion_tokens: req.maxTokens}
-      : {max_tokens: req.maxTokens};
+    const tokenCap = {[config.tokenCapField(opts.model)]: req.maxTokens};
     // Prior turns slot between the system message and the current
     // user message, mirroring the transcript order the API expects.
     const history = (req.history ?? []).map(t => ({
@@ -78,17 +97,18 @@ export const createOpenAIClient = (
         {role: 'user', content: userContent},
       ],
     };
-    const res = await fetchFn(ENDPOINT, {
+    const res = await fetchFn(config.endpoint, {
       method: 'POST',
       signal: req.signal,
       headers: {
+        ...config.extraHeaders,
         'content-type': 'application/json',
         Authorization: `Bearer ${opts.apiKey}`,
       },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      await throwHttpError('openai', res);
+      await throwHttpError(config.id, res);
     }
     const data = (await res.json()) as {
       choices?: Array<{
@@ -127,3 +147,16 @@ export const createOpenAIClient = (
     };
   },
 });
+
+export const createOpenAIClient = (
+  fetchFn: typeof fetch = globalThis.fetch,
+): ProviderClient =>
+  createChatCompletionsClient(
+    {
+      id: 'openai',
+      endpoint: ENDPOINT,
+      tokenCapField: model =>
+        usesMaxCompletionTokens(model) ? 'max_completion_tokens' : 'max_tokens',
+    },
+    fetchFn,
+  );
