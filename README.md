@@ -82,6 +82,8 @@ https://github.com/user-attachments/assets/ac096146-8aee-4304-af62-0f9a9776485b
    key=sk-proj-1345abCDef67890hijkLMNOpqrSTUvwxYZ012abc
    ```
 
+   Every field and each provider's details are in [Key file format](#key-file-format) and [Setting up each provider](#setting-up-each-provider).
+
 4. **Tap the Copilot button** on the sidebar of any note, PDF, or EPUB. The popup opens; tap **Summary** to confirm everything works.
 
 That's it. There is no account to create, no service to register against, no companion app on your phone.
@@ -96,11 +98,114 @@ That's it. There is no account to create, no service to register against, no com
 | DeepSeek | `deepseek-chat` | no — text only | Cheapest LLM available; fine for typed-text notes / extracted PDF text, no image support. |
 | OpenRouter | `google/gemini-2.5-flash` | yes, if the model takes images | Same low-cost vision model as the Gemini template, billed through OpenRouter. |
 
-You can change `model=` to any model the provider exposes — the plugin doesn't allow-list. If a model name is wrong the provider returns an HTTP error, which is shown verbatim in the chat as `Error: <provider>: HTTP <status>`.
+You can change `model=` to any model the provider exposes — the plugin doesn't allow-list. If a model name is wrong the provider returns an HTTP error, which is shown in the chat as `Error: <provider>: HTTP <status>`.
 
-> **OpenAI gpt-5 / o-series users:** the plugin auto-detects newer reasoning + GPT-5 family model ids (`gpt-5*`, `o1*`, `o3*`, `o4*`) and sends `max_completion_tokens` instead of the legacy `max_tokens` field that those models reject. You don't need to do anything — just put the model id in `model=` and it works.
+## Key file format
 
-> **OpenRouter users:** `model=` takes the OpenRouter model id with its vendor prefix, exactly as it appears on [openrouter.ai/models](https://openrouter.ai/models) — `anthropic/claude-sonnet-4.5`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`. Copilot sends the page screenshot, so pick a model that accepts image input; a text-only model answers with `Error: openrouter: HTTP 404`.
+Each provider gets one plain-text file in `/storage/emulated/0/MyStyle/SnCopilot/`, named `copilot-key-<provider>.txt`, with one `name=value` per line:
+
+```text
+provider=anthropic
+model=claude-haiku-4-5
+key=sk-ant-...
+```
+
+| Field | Required | What goes in it |
+|---|---|---|
+| `provider` | yes | `anthropic`, `openai`, `gemini`, `deepseek` or `openrouter`. It must match the provider in the filename. |
+| `model` | yes | The model id, exactly as the provider spells it. |
+| `key` | yes | Your API key. |
+| `default_provider` | only with two or more key files | The provider Copilot should use. See [More than one provider](#more-than-one-provider). |
+
+The filename also accepts a few common spellings: `copilot-key-claude.txt`, `-claude-ai` and `-claude-anthropic` for Anthropic; `-gpt` and `-chatgpt` for OpenAI; `-google` and `-google-gemini` for Gemini; `-open-router` for OpenRouter. The `provider=` line inside always uses the canonical name, so `copilot-key-claude.txt` still says `provider=anthropic`.
+
+How the file is read:
+
+- Lines starting with `#` are comments, and blank lines are skipped.
+- Spaces around the name, the `=` and the value are trimmed; tabs and Windows line endings are fine.
+- Everything after the `=` is the value. Quotes are kept, so write `key=sk-...`, not `key="sk-..."`, and don't put a `#` comment at the end of a line.
+- If a field appears twice, the last one wins. Unknown fields are ignored.
+
+When a file can't be used — a required field missing, or `provider=` not matching the filename — Settings lists the file with the reason.
+
+## Setting up each provider
+
+### Anthropic (Claude)
+
+Get a key at [console.anthropic.com](https://console.anthropic.com/) and start from `templates/copilot-key-anthropic.txt`:
+
+```text
+provider=anthropic
+model=claude-haiku-4-5
+key=sk-ant-...
+```
+
+Every current Claude model reads the page image.
+
+### OpenAI
+
+Get a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) and start from `templates/copilot-key-openai.txt`:
+
+```text
+provider=openai
+model=gpt-4o-mini
+key=sk-proj-...
+```
+
+Use a model that accepts images, such as `gpt-4o-mini`, `gpt-4o` or `gpt-5`. For the GPT-5 family and the o-series reasoning models (`gpt-5*`, `o1*`, `o3*`, `o4*`) the plugin sends `max_completion_tokens` instead of the older `max_tokens` those models reject, so any of them works as-is.
+
+### Google Gemini
+
+Get a key at [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) and start from `templates/copilot-key-gemini.txt`:
+
+```text
+provider=gemini
+model=gemini-2.5-flash
+key=AIza...
+```
+
+Gemini models read the page image. Use the model id as Google lists it, without a `models/` prefix.
+
+### DeepSeek
+
+Get a key at [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys) and start from `templates/copilot-key-deepseek.txt`:
+
+```text
+provider=deepseek
+model=deepseek-chat
+key=sk-...
+```
+
+DeepSeek has no vision endpoint, so Copilot sends only the page text (typed text and handwriting recognition), never the image, and scrubs emails and 7+ digit runs from it first. PilotChat needs a provider that reads images, so it isn't available on DeepSeek.
+
+### OpenRouter
+
+Get a key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) and start from `templates/copilot-key-openrouter.txt`:
+
+```text
+provider=openrouter
+model=google/gemini-2.5-flash
+key=sk-or-v1-...
+```
+
+One OpenRouter key reaches models from many vendors. `model=` is the OpenRouter model id with its vendor prefix, exactly as it appears on [openrouter.ai/models](https://openrouter.ai/models): `anthropic/claude-sonnet-4.5`, `openai/gpt-4o-mini`, `google/gemini-2.5-flash`. Copilot sends the page image, so pick a model that accepts image input; a text-only model answers with `Error: openrouter: HTTP 404`. Usage shows up as SnCopilot in your OpenRouter activity log.
+
+### More than one provider
+
+You can keep key files for several providers side by side. Add `default_provider=` to one of them to say which one Copilot uses:
+
+```text
+MyStyle/SnCopilot/
+├── copilot-key-openai.txt        provider=openai, model=gpt-5, key=...
+└── copilot-key-openrouter.txt    provider=openrouter, model=google/gemini-2.5-flash, key=...,
+                                  default_provider=openrouter
+```
+
+- With no `default_provider` in any file, Copilot asks you to add one.
+- If two files name different defaults, Copilot won't guess; make them agree or remove one.
+- If the default names a provider with no key file, Copilot says which file is missing.
+
+To switch providers, change the `default_provider=` line, or remove the other key files.
 
 ## PilotChat — ask in your own handwriting (Notes)
 
