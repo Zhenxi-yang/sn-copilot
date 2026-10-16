@@ -4,7 +4,7 @@
  * in `./index.ts` resolves the right implementation by id.
  */
 
-import type {ProviderId} from '../types';
+import type {DeepSeekReasoningEffort, ProviderId} from '../types';
 
 export type {ProviderId};
 
@@ -27,10 +27,7 @@ export type ProviderTurn = {
 export interface ProviderRequest {
   systemPrompt: string;
   userText: string;
-  // Optional base64-encoded PNG of the current page. Image-capable
-  // providers (anthropic, openai, gemini, openrouter) attach it as an
-  // image part alongside the text; deepseek (text-only) drops it with
-  // a warn.
+  // Optional base64-encoded PNG of the current page.
   imageBase64?: string;
   // Prior turns of the current conversation, oldest first, already
   // normalised by buildProviderHistory (starts with 'user', strictly
@@ -38,7 +35,10 @@ export interface ProviderRequest {
   // onto its native message array. Absent/empty → single-turn send,
   // identical to the previous behaviour.
   history?: ProviderTurn[];
-  maxTokens: number;
+  maxTokens?: number;
+  temperature?: number;
+  reasoningEffort?: DeepSeekReasoningEffort;
+  onDelta?: (chunk: string) => void;
   signal: AbortSignal;
 }
 

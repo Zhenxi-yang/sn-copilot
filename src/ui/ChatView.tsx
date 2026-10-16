@@ -40,7 +40,6 @@ import {
 import Markdown from 'react-native-markdown-display';
 import CopilotOverlay from '../native/CopilotOverlay';
 import {debugLog, infoLog} from '../diagnostics/log';
-import {redactPii} from '../privacy/redact';
 import {tryAcquire, release} from '../reentrancy/inFlightGuard';
 import {getPageContext} from '../scope/pageContext';
 import {
@@ -63,12 +62,14 @@ import {buildProviderHistory} from './providerHistory';
 import {shouldAttachPageContext, type SendSource} from './contextRouting';
 import {buildMarkdownStyles} from './markdownStyles';
 import {markdownToPlainText} from './markdownToPlain';
+import {normalizeLatexForMarkdown} from './latexMarkdown';
 import {sanitizeProviderError} from './sanitizeProviderError';
 import {assertUsable} from '../providers/stopReason';
 import SetupChecklist from './SetupChecklist';
 import {SYSTEM_PROMPT} from './systemPrompt';
 import {useProviderClient} from './useProviderClient';
 import {REPLY_MAX_TOKENS, REPLY_TIMEOUT_MS} from '../providers/replyBudget';
+import {buildChatSvgBase64} from './chatExport';
 
 // Three-step font scaling. Scale factors keep e-ink rendering
 // readable across 7.8" and 10.3" devices without per-device tables.
@@ -312,6 +313,7 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
   >(null);
   const [history, setHistory] = useState<Conversation[]>([]);
   const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
   const conversationCreatedAtRef = useRef<number | null>(null);
   const fontScale = FONT_SCALE[fontSize];
   const canShrink = fontSize !== 'S';
@@ -441,26 +443,20 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
       // existing "thinking" placeholder. When we won't attach, skip
       // the await entirely.
       const ctx = attachContext ? await getPageContext() : null;
-      // Vision capability is purely a property of the provider —
-      // anthropic / openai / gemini / openrouter get the page image,
-      // deepseek doesn't. For text-only providers we silently scrub emails
-      // and long digit runs (the only place redaction can actually
-      // help, since there's no image channel). For image-capable
-      // providers we send the composed text verbatim — redacting
-      // text while shipping the full screenshot would be theatre.
+      // DeepSeek supports image input; keep text/image channels aligned.
       const composed = composeUserText(trimmed, ctx);
       const allowImage =
         keyFile === undefined || isImageCapableProvider(keyFile.provider);
-      const userText = allowImage ? composed : redactPii(composed);
+      const userText = composed;
       const imageBase64 = allowImage ? ctx?.screenshotBase64 : undefined;
       // Replay of the prior turns (snapshotted before the append
       // above) so follow-ups keep their context. Text-only; on the
       // DeepSeek path each replayed turn is scrubbed the same way as
       // the current one (message texts were stored for display,
       // never redacted at store time).
-      const wireTurns = allowImage
-        ? priorTurns
-        : priorTurns.map(t => ({...t, text: redactPii(t.text)}));
+      const wireTurns = priorTurns;
+      const streamMsgId = newId();
+      let streamedText = '';
       infoLog(
         '[COPILOT_CHAT] send ' +
           `provider=${keyFile?.provider ?? 'fake'} ` +
@@ -478,6 +474,26 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
           imageBase64,
           history: wireTurns,
           maxTokens: REPLY_MAX_TOKENS,
+          temperature: keyFile?.deepseekTemperature,
+          reasoningEffort: keyFile?.deepseekReasoningEffort,
+          onDelta: chunk => {
+            streamedText += chunk;
+            setMessages(curr => {
+              const withoutThinking = curr.filter(m => m.id !== thinkingMsg.id);
+              const existing = withoutThinking.find(
+                m => m.role === 'assistant' && m.id === streamMsgId,
+              );
+              const nextAssistant: ChatMessage = {
+                id: streamMsgId,
+                role: 'assistant',
+                text: normalizeLatexForMarkdown(streamedText),
+              };
+              if (existing) {
+                return withoutThinking.map(m => (m.id === streamMsgId ? nextAssistant : m));
+              }
+              return [...withoutThinking, nextAssistant];
+            });
+          },
           signal: ctl.signal,
         },
         {apiKey, model},
@@ -504,9 +520,9 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
       // never replayed to the model as something it said.
       assertUsable(r, {acceptPartial: true});
       const assistantMsg: ChatMessage = {
-        id: newId(),
+        id: streamMsgId,
         role: 'assistant',
-        text: r.text,
+        text: normalizeLatexForMarkdown(r.text),
         // Render-time flag, NOT baked into text: the marker must not
         // travel back to the provider as words the model wrote, and it
         // is persisted with the message, so a reloaded conversation
@@ -532,7 +548,7 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
       const errorMsg: ChatMessage = {
         id: newId(),
         role: 'assistant',
-        text: `Error: ${userVisible}`,
+        text: normalizeLatexForMarkdown(`Error: ${userVisible}`),
         // Shown to the user, never sent back to the provider.
         isError: true,
       };
@@ -551,6 +567,27 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
       setBusy(false);
     }
   }, [apiKey, client, effectiveSystemPrompt, keyFile, model, persistTurn]);
+
+  const onExportChat = useCallback(async () => {
+    const snapshot = messagesRef.current
+      .filter((m): m is Extract<ChatMessage, {role: 'user' | 'assistant'}> => m.role !== 'thinking')
+      .map((m) => ({role: m.role, text: markdownToPlainText(m.text)}));
+    if (snapshot.length === 0) {
+      setExportFeedback('Nothing to export.');
+      return;
+    }
+    const outputPath = `/storage/emulated/0/MyStyle/SnCopilot/chat-export-${Date.now()}.svg`;
+    try {
+      const base64 = buildChatSvgBase64(snapshot, {providerLabel: provider});
+      const r = await CopilotOverlay.writeFileBase64(outputPath, base64);
+      if (!r.success) {
+        throw new Error(r.message);
+      }
+      setExportFeedback(`Saved: ${outputPath}`);
+    } catch (e) {
+      setExportFeedback(`Export failed: ${(e as Error).message}`);
+    }
+  }, [provider]);
 
   // Single dispatch for any action button (built-in OR user-defined).
   // The id is opaque here — we look up the prompt from the merged
@@ -779,10 +816,17 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
             <Text style={styles.iconBtnText}>{'✎'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            testID="chat-settings"
-            accessibilityLabel="Open Copilot settings"
-            onPress={onSettingsTap}
+          testID="chat-export"
+          accessibilityLabel="Export chat as image"
+          onPress={onExportChat}
             style={styles.iconBtn}>
+          <Text style={styles.iconBtnText}>{'🖼'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+          testID="chat-settings"
+          accessibilityLabel="Open Copilot settings"
+          onPress={onSettingsTap}
+          style={styles.iconBtn}>
             {/* Bare gear codepoint (U+2699) — explicitly text
                 presentation. Combined with the bumped fontSize (22)
                 and weight 700 in iconBtnText, this reads boldly on
@@ -798,14 +842,15 @@ export default function ChatView(props: ChatViewProps): React.JSX.Element {
           into the empty-state of the chat scroll (see SuggestionCards
           below) so the chat area dominates the panel. */}
 
-      {/* Privacy caution — matches README: vision providers send the
-          screenshot as-is; DeepSeek is text-only so outbound text is
-          scrubbed (emails, 7+ digit runs). No per-message toggle. */}
       <Text testID="chat-privacy-note" style={styles.privacyNote}>
         {'🛡️'} Avoid sharing sensitive info; the visible page is sent to
-        your provider. Vision models receive the image; DeepSeek scrubs
-        emails and long digits from text only.
+        your provider.
       </Text>
+      {exportFeedback !== null ? (
+        <Text testID="chat-export-feedback" style={styles.exportNote}>
+          {exportFeedback}
+        </Text>
+      ) : null}
 
       <View style={styles.divider} />
 
@@ -1205,6 +1250,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 6,
     marginBottom: 4,
+  },
+  exportNote: {
+    fontSize: 11,
+    color: '#000000',
+    marginBottom: 6,
   },
   divider: {
     height: 1,

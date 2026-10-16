@@ -23,4 +23,4 @@ export const REPLY_TIMEOUT_MS = 120_000;
 // rejects a max_tokens above a model's maximum, so a larger value would
 // break configurations that work today. Provisional — the reasoningTokens
 // figure logged on each send is what this should be tuned from.
-export const REPLY_MAX_TOKENS = 4000;
+export const REPLY_MAX_TOKENS: number | undefined = undefined;

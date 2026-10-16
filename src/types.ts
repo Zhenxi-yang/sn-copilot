@@ -21,6 +21,8 @@ export const PROVIDER_IDS: readonly ProviderId[] = [
   'openrouter',
 ] as const;
 
+export type DeepSeekReasoningEffort = 'off' | 'low' | 'medium' | 'high';
+
 // Parsed contents of one copilot-key-<provider>.txt file. Produced by
 // src/storage/keyFiles.ts, consumed by src/storage/activeProvider.ts.
 //
@@ -38,6 +40,8 @@ export type KeyFile = {
   defaultProvider?: ProviderId;
   // Per-action override of the default PII redaction policy. text-only.
   clarifyRedact?: boolean;
+  deepseekReasoningEffort?: DeepSeekReasoningEffort;
+  deepseekTemperature?: number;
   // Source path on disk; shown in Settings as "Managed by …".
   sourcePath: string;
 };
@@ -45,8 +49,7 @@ export type KeyFile = {
 // Single source of truth for "does this provider's API accept image
 // inputs?". Used by the chat send path to decide whether to attach
 // the page screenshot.
-export const isImageCapableProvider = (provider: ProviderId): boolean =>
-  provider !== 'deepseek';
+export const isImageCapableProvider = (_provider: ProviderId): boolean => true;
 
 // Resolved at startup and on Settings refresh. Either a fully
 // validated active provider, or a reason no provider can be selected.

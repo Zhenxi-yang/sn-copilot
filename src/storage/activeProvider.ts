@@ -2,66 +2,33 @@
 // Pure function — no IO, fully unit-testable.
 //
 // Rules:
-//   1. Zero key files                        → 'none' with setup message.
-//   2. Exactly one key file                  → that provider.
-//   3. Two or more files, agreeing default   → that provider.
-//   4. Two or more files, disagreeing        → 'ambiguous'.
-//   5. Two or more files, no default at all  → 'none' with setup message.
-//   6. default_provider names a missing file → 'none'.
+//   1. Zero key files      → 'none' with setup message.
+//   2. Exactly one key file → that provider.
+//   3. Two or more files   → ambiguous (DeepSeek-only mode expects one file).
 
-import type {KeyFile, ProviderId, ProviderResolution} from '../types';
+import type {KeyFile, ProviderResolution} from '../types';
 import type {AppState} from './appState';
 
 export const resolveActiveProvider = (files: KeyFile[]): ProviderResolution => {
-  if (files.length === 0) {
+  const deepseekFiles = files.filter((f) => f.provider === 'deepseek');
+  if (deepseekFiles.length === 0) {
     return {
       kind: 'none',
       message:
-        'No key file found. Drop a copilot-key-<provider>.txt file in MyStyle/SnCopilot/ to enable Copilot.',
+        'No DeepSeek key file found. Drop copilot-key-deepseek.txt in MyStyle/SnCopilot/ to enable Copilot.',
     };
   }
-  if (files.length === 1) {
-    return {kind: 'ok', active: files[0], others: []};
-  }
-
-  // Aggregate default_provider declarations. We accept multiple files
-  // declaring the SAME default_provider (redundant but consistent);
-  // any disagreement is ambiguous.
-  const declared = new Set<ProviderId>();
-  for (const f of files) {
-    if (f.defaultProvider !== undefined) {
-      declared.add(f.defaultProvider);
-    }
-  }
-
-  if (declared.size === 0) {
+  if (deepseekFiles.length === 1) {
     return {
-      kind: 'none',
-      message:
-        'Multiple key files configured but none marked default. Add `default_provider=<name>` to one file.',
-    };
-  }
-  if (declared.size > 1) {
-    return {
-      kind: 'ambiguous',
-      message:
-        'Multiple key files declare conflicting default_provider values. Pick one.',
-      candidates: files,
-    };
-  }
-
-  const wanted = Array.from(declared)[0];
-  const active = files.find(f => f.provider === wanted);
-  if (!active) {
-    return {
-      kind: 'none',
-      message: `default_provider="${wanted}" but no copilot-key-${wanted}.txt was found.`,
+      kind: 'ok',
+      active: deepseekFiles[0],
+      others: files.filter((f) => f !== deepseekFiles[0]),
     };
   }
   return {
-    kind: 'ok',
-    active,
-    others: files.filter(f => f.provider !== wanted),
+    kind: 'ambiguous',
+    message: 'Multiple DeepSeek key files found. Keep only one copilot-key-deepseek.txt.',
+    candidates: deepseekFiles,
   };
 };
 

@@ -9,8 +9,8 @@ import {StyleSheet, Text, View} from 'react-native';
 
 const SETUP_STEPS: ReadonlyArray<{title: string; body: string}> = [
   {
-    title: 'Pick a provider',
-    body: 'Anthropic, OpenAI, Google Gemini, DeepSeek, or OpenRouter. Grab an API key from their console.',
+    title: 'Get a DeepSeek API key',
+    body: 'Create or copy your key from DeepSeek Console.',
   },
   {
     title: 'Create the folder',
@@ -18,11 +18,11 @@ const SETUP_STEPS: ReadonlyArray<{title: string; body: string}> = [
   },
   {
     title: 'Add the key file',
-    body: 'Save copilot-key-<provider>.txt in that folder with three lines: provider=, model=, and key=<your API key>. Templates live in the templates/ folder of the GitHub repo.',
+    body: 'Save copilot-key-deepseek.txt in that folder with provider=deepseek, model=..., and key=<your API key>.',
   },
   {
     title: 'Tap Refresh',
-    body: 'Open ⚙ Settings and tap "Refresh from disk" — Copilot picks up the file without restarting.',
+    body: 'Open ⚙ Settings and tap Refresh — Copilot picks up the file without restarting.',
   },
 ];
 
@@ -57,11 +57,8 @@ export default function SetupChecklist(
         </View>
       ))}
       <Text style={styles.tolerance}>
-        Filename tolerance:{' '}
-        <Text style={styles.mono}>copilot-key-claude.txt</Text> →
-        anthropic;{' '}
-        <Text style={styles.mono}>copilot-key-google.txt</Text> →
-        gemini.
+        Filename tolerance: <Text style={styles.mono}>copilot-key-ds.txt</Text> →
+        deepseek.
       </Text>
     </View>
   );
