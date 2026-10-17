@@ -21,6 +21,7 @@ import CopilotOverlay from '../native/CopilotOverlay';
 import {activeKeyFromState} from '../storage/activeProvider';
 import {readCustomActions} from '../storage/customActionsFile';
 import {readPersona} from '../storage/personaFile';
+import {readSystemPromptProfiles} from '../storage/systemPromptProfilesFile';
 import {setHasSeenSettings} from '../storage/prefs';
 import {useCopilotState} from '../storage/useCopilotState';
 import {
@@ -60,12 +61,8 @@ export type CopilotPanelProps = {
 const DEFAULT_SCOPE_LABEL = 'Current Page';
 const PROVIDER_LABEL_FALLBACK = 'Demo (no key)';
 
-const PROVIDER_LABEL_FOR_ACTIVE: Record<ProviderId, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  gemini: 'Gemini',
+const PROVIDER_LABEL_FOR_ACTIVE: Partial<Record<ProviderId, string>> = {
   deepseek: 'DeepSeek',
-  openrouter: 'OpenRouter',
 };
 
 export default function CopilotPanel(
@@ -158,24 +155,32 @@ function CopilotPanelInner(props: InnerProps): React.JSX.Element {
   const [persona, setPersona] = useState<string | null>(null);
   const [customActions, setCustomActions] = useState<CustomAction[]>([]);
   const reloadFiles = useCallback(async () => {
-    const [p, actions] = await Promise.all([
+    const [p, promptProfiles, actions] = await Promise.all([
       readPersona({io: bundle.io}),
+      readSystemPromptProfiles({io: bundle.io}),
       readCustomActions({io: bundle.io}),
     ]);
-    setPersona(p);
+    const activePrompt =
+      promptProfiles.profiles.find((profile) => profile.id === promptProfiles.activeId)
+        ?.prompt ?? null;
+    setPersona(activePrompt ?? p);
     setCustomActions(actions);
   }, [bundle.io]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [p, actions] = await Promise.all([
+      const [p, promptProfiles, actions] = await Promise.all([
         readPersona({io: bundle.io}),
+        readSystemPromptProfiles({io: bundle.io}),
         readCustomActions({io: bundle.io}),
       ]);
       if (cancelled) {
         return;
       }
-      setPersona(p);
+      const activePrompt =
+        promptProfiles.profiles.find((profile) => profile.id === promptProfiles.activeId)
+          ?.prompt ?? null;
+      setPersona(activePrompt ?? p);
       setCustomActions(actions);
     })();
     return () => {
@@ -321,7 +326,7 @@ function CopilotPanelInner(props: InnerProps): React.JSX.Element {
 
   const activeKeyFile = activeKeyFromState(state);
   const providerLabel = activeKeyFile
-    ? PROVIDER_LABEL_FOR_ACTIVE[activeKeyFile.provider]
+    ? (PROVIDER_LABEL_FOR_ACTIVE[activeKeyFile.provider] ?? activeKeyFile.provider)
     : PROVIDER_LABEL_FALLBACK;
 
   // Grill Me availability: needs a configured key file AND the open
@@ -374,11 +379,8 @@ function GrillScreen(props: GrillScreenProps): React.JSX.Element {
   const {keyFile, pageContext, onBack} = props;
   const {client, apiKey, model} = useProviderClient(keyFile);
   const attachImage = isImageCapableProvider(keyFile.provider);
-  // Privacy contract parity with ChatView: vision providers ship the
-  // page image, so scrubbing the text-side too would be theatre.
-  // Text-only providers (DeepSeek) don't get an image channel, so the
-  // page text is the only thing on the wire — scrub emails + long
-  // digit runs before any grill module sees it.
+  // DeepSeek now supports image input; keep text untouched so text and
+  // image channels remain consistent.
   const sanitizedPageContext: PageContext = attachImage
     ? pageContext
     : {...pageContext, pageText: redactPii(pageContext.pageText)};

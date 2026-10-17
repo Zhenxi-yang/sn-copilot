@@ -1,7 +1,7 @@
 // Discovery + parsing for `copilot-key-<provider>.txt` files under
 // `/storage/emulated/0/MyStyle/SnCopilot/`.
 //
-// One file per provider (anthropic|openai|gemini|deepseek|openrouter). The user
+// One file per provider (deepseek). The user
 // drops these in via USB or any cloud-sync provider and edits in
 // place. The plugin never writes to them.
 //
@@ -10,7 +10,12 @@
 // editor quirks (trailing whitespace, tabs, CRLF, blank lines,
 // comments).
 
-import {PROVIDER_IDS, type KeyFile, type ProviderId} from '../types';
+import {
+  PROVIDER_IDS,
+  type DeepSeekReasoningEffort,
+  type KeyFile,
+  type ProviderId,
+} from '../types';
 import {decodeUtf8} from '../sdk/utf8';
 import type {Logger} from '../sdk/types';
 
@@ -44,33 +49,24 @@ export type DiscoveryDeps = {
 // All keys are lowercased for the lookup — the matcher
 // case-folds the actual filename.
 //
-//   anthropic / claude / claude-ai / claude-anthropic → anthropic
-//   openai    / gpt    / chatgpt                       → openai
-//   gemini    / google / google-gemini                 → gemini
-//   deepseek                                            → deepseek
-//   openrouter / open-router                            → openrouter
+//   deepseek / ds                                       → deepseek
 //
 // The in-file `provider=` line still cross-checks against the
 // CANONICAL id (so a `copilot-key-claude.txt` must contain
 // `provider=anthropic`, not `provider=claude` — defensive against
 // users renaming a file and forgetting to update its content).
 const FILENAME_SUFFIX_MAP: Record<string, ProviderId> = {
-  anthropic: 'anthropic',
-  claude: 'anthropic',
-  'claude-ai': 'anthropic',
-  'claude-anthropic': 'anthropic',
-  openai: 'openai',
-  gpt: 'openai',
-  chatgpt: 'openai',
-  gemini: 'gemini',
-  google: 'gemini',
-  'google-gemini': 'gemini',
   deepseek: 'deepseek',
-  openrouter: 'openrouter',
-  'open-router': 'openrouter',
+  ds: 'deepseek',
 };
 
 const FILENAME_RE = /^copilot-key-(.+)\.txt$/;
+const REASONING_EFFORTS: readonly DeepSeekReasoningEffort[] = [
+  'off',
+  'low',
+  'medium',
+  'high',
+] as const;
 
 export const matchKeyFilename = (fileName: string): ProviderId | null => {
   const m = FILENAME_RE.exec(fileName.toLowerCase().trim());
@@ -200,6 +196,30 @@ export const parseKeyFile = (
         `${TAG} ${fileName}: invalid clarify_redact="${fields.clarify_redact}" — ignored`,
       );
     }
+
+    let deepseekReasoningEffort: DeepSeekReasoningEffort | undefined;
+    if (fields.reasoning_effort !== undefined) {
+      const raw = fields.reasoning_effort.toLowerCase();
+      if (REASONING_EFFORTS.includes(raw as DeepSeekReasoningEffort)) {
+        deepseekReasoningEffort = raw as DeepSeekReasoningEffort;
+      } else {
+        logger.warn(
+          `${TAG} ${fileName}: invalid reasoning_effort="${fields.reasoning_effort}" — ignored`,
+        );
+      }
+    }
+
+    let deepseekTemperature: number | undefined;
+    if (fields.temperature !== undefined) {
+      const v = Number(fields.temperature);
+      if (Number.isFinite(v) && v >= 0 && v <= 2) {
+        deepseekTemperature = v;
+      } else {
+        logger.warn(
+          `${TAG} ${fileName}: invalid temperature="${fields.temperature}" (expected 0..2) — ignored`,
+        );
+      }
+    }
   }
 
   for (const k of Object.keys(fields)) {
@@ -209,7 +229,9 @@ export const parseKeyFile = (
       k !== 'key' &&
       k !== 'mode' &&
       k !== 'default_provider' &&
-      k !== 'clarify_redact'
+      k !== 'clarify_redact' &&
+      k !== 'reasoning_effort' &&
+      k !== 'temperature'
     ) {
       logger.log(`${TAG} ${fileName}: ignored unknown key "${k}"`);
     }
@@ -223,6 +245,8 @@ export const parseKeyFile = (
       key: fields.key,
       defaultProvider,
       clarifyRedact,
+      deepseekReasoningEffort,
+      deepseekTemperature,
       sourcePath: path,
     },
   };

@@ -36,6 +36,13 @@ import {
   CUSTOM_ACTIONS_PATH,
 } from '../storage/customActionsFile';
 import {readPersona, writePersona} from '../storage/personaFile';
+import {
+  readSystemPromptProfiles,
+  setActiveSystemPromptProfile,
+  SYSTEM_PROMPTS_PATH,
+  type SystemPromptProfile,
+  type SystemPromptProfileState,
+} from '../storage/systemPromptProfilesFile';
 import {setEncryptionMode, setIdleTimeoutMin} from '../storage/prefs';
 import * as idleTimer from '../storage/idleTimer';
 import {
@@ -79,14 +86,10 @@ const TEST_CONNECTION_TIMEOUT_MS = 120_000;
 // Stays under 4096 like the others — older models cap output there and
 // Anthropic rejects a max_tokens above a model's maximum. Provisional:
 // tune from the reasoningTokens figure logged on each send.
-const TEST_CONNECTION_MAX_TOKENS = 2000;
+const TEST_CONNECTION_MAX_TOKENS: number | undefined = undefined;
 
-const PROVIDER_LABEL: Record<ProviderId, string> = {
-  anthropic: 'Anthropic (Claude)',
-  openai: 'OpenAI',
-  gemini: 'Google (Gemini)',
+const PROVIDER_LABEL: Partial<Record<ProviderId, string>> = {
   deepseek: 'DeepSeek',
-  openrouter: 'OpenRouter',
 };
 
 type TestStatus =
@@ -235,6 +238,8 @@ function SettingsViewBody(props: {
             'You are a helpful assistant. Respond briefly to confirm the connection works.',
           userText: 'Hello',
           maxTokens: TEST_CONNECTION_MAX_TOKENS,
+          temperature: active.deepseekTemperature,
+          reasoningEffort: active.deepseekReasoningEffort,
           signal: ctl.signal,
         },
         {apiKey: active.key, model: active.model},
@@ -371,6 +376,12 @@ function SettingsViewBody(props: {
         if (f.clarifyRedact !== undefined) {
           lines.push(`clarify_redact=${f.clarifyRedact ? 'on' : 'off'}`);
         }
+        if (f.deepseekReasoningEffort !== undefined) {
+          lines.push(`reasoning_effort=${f.deepseekReasoningEffort}`);
+        }
+        if (f.deepseekTemperature !== undefined) {
+          lines.push(`temperature=${f.deepseekTemperature}`);
+        }
         const path = `/storage/emulated/0/MyStyle/SnCopilot/copilot-key-${f.provider}.txt`;
         await bundle.io.writeBytes(path, encodeUtf8(lines.join('\n') + '\n'));
       }
@@ -443,6 +454,25 @@ function SettingsViewBody(props: {
   useEffect(() => {
     reloadActionsPreview().catch(() => undefined);
   }, [reloadActionsPreview]);
+
+  const [promptProfiles, setPromptProfiles] = useState<SystemPromptProfileState>({
+    activeId: null,
+    profiles: [],
+  });
+  const reloadPromptProfiles = useCallback(async () => {
+    const state = await readSystemPromptProfiles({io: bundle.io});
+    setPromptProfiles(state);
+  }, [bundle.io]);
+  useEffect(() => {
+    reloadPromptProfiles().catch(() => undefined);
+  }, [reloadPromptProfiles]);
+  const onActivatePromptProfile = useCallback(
+    async (profile: SystemPromptProfile) => {
+      const state = await setActiveSystemPromptProfile({io: bundle.io}, profile.id);
+      setPromptProfiles(state);
+    },
+    [bundle.io],
+  );
 
   // Sub-flow renders take over the entire view.
   if (subFlow.kind === 'pin-setup') {
@@ -592,6 +622,13 @@ function SettingsViewBody(props: {
         onSave={onSavePersona}
       />
 
+      <SystemPromptProfilesSection
+        profiles={promptProfiles}
+        filePath={SYSTEM_PROMPTS_PATH}
+        onReload={reloadPromptProfiles}
+        onActivate={onActivatePromptProfile}
+      />
+
       <CustomActionsSettings
         actions={actionsPreview}
         filePath={CUSTOM_ACTIONS_PATH}
@@ -601,11 +638,8 @@ function SettingsViewBody(props: {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Privacy</Text>
         <Text testID="settings-privacy-note" style={styles.privacyNote}>
-          On vision providers (Anthropic / OpenAI / Gemini / OpenRouter)
-          the page screenshot and any transcribed text are sent verbatim
-          — no on-device redaction. On DeepSeek (text-only) emails and
-          7+ digit runs are scrubbed from the outbound text. Either
-          way, avoid opening sensitive pages while Copilot is active.
+          DeepSeek receives the visible page screenshot and transcribed
+          text. Avoid opening sensitive pages while Copilot is active.
         </Text>
       </View>
       </ScrollView>
@@ -714,7 +748,9 @@ function ActiveProviderBlock({active}: {active: KeyFile}): React.JSX.Element {
     <View testID="settings-resolution-ok" style={styles.activeBlock}>
       <View style={styles.fieldRow}>
         <Text style={styles.fieldLabel}>Provider</Text>
-        <Text style={styles.fieldValue}>{PROVIDER_LABEL[active.provider]}</Text>
+        <Text style={styles.fieldValue}>
+          {PROVIDER_LABEL[active.provider] ?? active.provider}
+        </Text>
       </View>
       <View style={styles.fieldRow}>
         <Text style={styles.fieldLabel}>Model</Text>
@@ -740,6 +776,64 @@ function ActiveProviderBlock({active}: {active: KeyFile}): React.JSX.Element {
           {active.sourcePath}
         </Text>
       </View>
+      <View style={styles.fieldRow}>
+        <Text style={styles.fieldLabel}>Reasoning</Text>
+        <Text style={styles.fieldValue}>
+          {active.deepseekReasoningEffort ?? 'off'}
+        </Text>
+      </View>
+      <View style={styles.fieldRow}>
+        <Text style={styles.fieldLabel}>Temperature</Text>
+        <Text style={styles.fieldValue}>
+          {active.deepseekTemperature ?? 'default'}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function SystemPromptProfilesSection(props: {
+  profiles: SystemPromptProfileState;
+  filePath: string;
+  onReload: () => void;
+  onActivate: (profile: SystemPromptProfile) => void;
+}): React.JSX.Element {
+  const {profiles, filePath, onReload, onActivate} = props;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>System Prompt Profiles</Text>
+      <Text style={styles.metaLine}>File: {filePath}</Text>
+      {profiles.profiles.length === 0 ? (
+        <Text style={styles.metaLine}>No profiles found. Add lines like: * Default: prompt</Text>
+      ) : (
+        profiles.profiles.map((p) => {
+          const active = p.id === profiles.activeId;
+          return (
+            <View key={p.id} style={styles.profileRow}>
+              <Text style={styles.fieldValue}>
+                {active ? '✓ ' : ''}{p.label}
+              </Text>
+              <TouchableOpacity
+                testID={`system-prompt-activate-${p.id}`}
+                accessibilityLabel={`Activate prompt profile ${p.label}`}
+                onPress={() => onActivate(p)}
+                disabled={active}
+                style={[styles.refreshBtn, active && styles.btnDisabled]}>
+                <Text style={styles.refreshBtnText}>
+                  {active ? 'Active' : 'Use'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })
+      )}
+      <TouchableOpacity
+        testID="system-prompt-reload"
+        accessibilityLabel="Reload system prompt profiles"
+        onPress={onReload}
+        style={styles.refreshBtn}>
+        <Text style={styles.refreshBtnText}>Reload profiles</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -836,6 +930,13 @@ const styles = StyleSheet.create({
   },
   smallValue: {
     fontSize: 11,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
   },
   refreshBtn: {
     marginTop: 12,
